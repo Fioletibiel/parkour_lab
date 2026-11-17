@@ -1,0 +1,31 @@
+name: "SIM-026C4B2D3A public native switched piecewise equality"
+on:
+  push:
+    branches: [main]
+    paths:
+      - lab/sim026c4b2d3a.py
+      - tests/test_sim026c4b2d3a.py
+      - .github/workflows/synthetic-native-piecewise-d3a.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source_free_native_piecewise:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install frozen native simulator
+        run: |
+          python -m pip install --only-binary=:all: 'mujoco==3.3.6' 'numpy<3'
+      - name: Synthetic switched-polynomial native unit and negative controls
+        run: |
+          python -B -m unittest -v tests.test_sim026c4b2d3a
+      - name: Native 11-state FK, 500-step idle, 500-step knot-crossing dynamics
+        run: |
+          python -B -m lab.sim026c4b2d3a
