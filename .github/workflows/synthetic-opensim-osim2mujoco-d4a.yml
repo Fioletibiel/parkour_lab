@@ -1,0 +1,47 @@
+name: "SIM-026C4B2D4A public synthetic OpenSim to osim2mujoco conversion capability"
+on:
+  push:
+    branches: [main]
+    paths:
+      - lab/sim026c4b2d4a_converter_pilot.py
+      - tests/test_sim026c4b2d4a_converter_pilot.py
+      - .github/workflows/synthetic-opensim-osim2mujoco-d4a.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  converter_synthetic_capability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      MPLBACKEND: Agg
+      PYTHONWARNINGS: ignore
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    steps:
+      - name: Checkout independent public-only Parkour lab
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout exact upstream public Apache-2.0 converter source
+        uses: actions/checkout@v4
+        with:
+          repository: wafisharif/osim2mujoco
+          ref: 8c4d97e96f43c0d1676b8d58b0cff95af72a0f0f
+          path: external_converter
+          persist-credentials: false
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact OpenSim4.6, MuJoCo3.15 and converter
+        run: |
+          python -m pip install --only-binary=:all: 'opensim==4.6' 'mujoco==3.15.0' 'numpy==2.5.3'
+          python -m pip install ./external_converter
+          python -m pip check
+      - name: Run source-free negative checks
+        run: |
+          python -B -m unittest -v tests.test_sim026c4b2d4a_converter_pilot
+      - name: Actual converter check, original-authored OpenSim XML and native MuJoCo compile
+        run: |
+          python -B -m lab.sim026c4b2d4a_converter_pilot
