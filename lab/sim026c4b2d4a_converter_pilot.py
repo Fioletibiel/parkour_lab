@@ -24,6 +24,9 @@ def build_model(filepath):
     import opensim as os
     p=pathlib.Path(filepath)
     p.parent.mkdir(parents=True,exist_ok=True)
+    # Upstream converter requires a Geometry directory even for mesh-free OpenSim XML.
+    # Empty directory is fixture infrastructure, not new source geometry or data.
+    (p.parent / 'Geometry').mkdir(exist_ok=True)
     model=os.Model()
     model.setName("original_source_free_two_pin_converter_fixture")
     model.setGravity(os.Vec3(0.,-9.80665,0.))
