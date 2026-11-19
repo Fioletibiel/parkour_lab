@@ -117,8 +117,7 @@ def run_case(name,q0,v0,g,dt):
     prev_e=native_energy(*[float(x) for x in data.qpos],
                          *[float(x) for x in data.qvel],g)
     e0=prev_e
-    prev_power=native_power(float(data.qvel[0]),float(data.qvel[1]),
-                            torque_at(name,0))
+    prev_vel=(float(data.qvel[0]),float(data.qvel[1]))
     n=round(HORIZON/dt)
     if abs(n*dt-HORIZON)>1e-14:
         raise ValueError("non-frozen physical horizon")
@@ -169,15 +168,14 @@ def run_case(name,q0,v0,g,dt):
                 raise AssertionError("sampled equality force jump too large")
         previous_force=force
         ee=native_energy(q,s,vq,vs,g)
-        p_after=native_power(vq,vs,tau)
-        # On a pulse transition integrate separate constant effort over each step.
-        supplied=.5*(native_power(float(data.qvel[0]),float(data.qvel[1]),tau)+prev_power)*dt
-        # previous q/s velocities must come from the pre-step snapshot; assigned below.
-        # We compute with the conserved, actual post state and prior actual values.
+        # Step-specific effort applies over the full interval, including pulse boundary.
+        # Integrate actual two-DoF dissipative power using pre/post velocities.
+        supplied=.5*(native_power(prev_vel[0],prev_vel[1],tau)
+                       +native_power(vq,vs,tau))*dt
         peak_defect=max(peak_defect,abs(ee-prev_e-supplied))
         total_work_damping+=supplied
         prev_e=ee
-        prev_power=p_after
+        prev_vel=(vq,vs)
         ref=reference_step(ref,t,dt,name,g)
     net=abs(prev_e-e0-total_work_damping)
     q_err=abs(float(data.qpos[0])-float(ref[0]))
