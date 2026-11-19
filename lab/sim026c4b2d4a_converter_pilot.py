@@ -128,6 +128,67 @@ def check_compiled(out):
             "source_vs_native_pose_equivalence":"NOT_TESTED_IN_THIS_G0_G4_PILOT"}
 
 
+
+def cross_engine_exact_heldout_fk(source_path, converted_path):
+    """Independently compare six true native OpenSim/MuJoCo source-frame poses.
+
+    Root ground frame in converted MJCF may rotate; compare both body transforms
+    relative to that body's root `ground` frame (not MuJoCo world convention).
+    """
+    import opensim as os
+    import mujoco as mu
+    import numpy as np
+
+    source=os.Model(str(source_path))
+    state=source.initSystem()
+    native=mu.MjModel.from_xml_path(str(converted_path.resolve()))
+    d=mu.MjData(native)
+    ground_id=mu.mj_name2id(native,mu.mjtObj.mjOBJ_BODY,"ground")
+    if ground_id<=0:
+        raise AssertionError("converter common ground frame missing")
+    jid=[mu.mj_name2id(native,mu.mjtObj.mjOBJ_JOINT,n) for n in DOFS]
+    if min(jid)<0:
+        raise AssertionError("source coordinate name not mapped")
+    max_pos=max_ang=0.0
+    for angles in POSITIONS:
+        for label,q in zip(DOFS,angles):
+            source.getCoordinateSet().get(label).setValue(state,q)
+        source.realizePosition(state)
+        for j,q in zip(jid,angles):
+            d.qpos[native.jnt_qposadr[j]]=q
+        mu.mj_forward(native,d)
+        rground=d.xmat[ground_id].reshape((3,3))
+        pg=d.xpos[ground_id]
+        for name in NAMES:
+            bid=mu.mj_name2id(native,mu.mjtObj.mjOBJ_BODY,name)
+            frame=source.getBodySet().get(name)
+            source_p=frame.findStationLocationInGround(state,os.Vec3(0.))
+            p0=np.asarray([float(source_p[i]) for i in range(3)])
+            columns=[]
+            for k in range(3):
+                axis=os.Vec3(1.,0.,0.) if k==0 else (os.Vec3(0.,1.,0.) if k==1 else os.Vec3(0.,0.,1.))
+                vec=frame.expressVectorInGround(state,axis)
+                columns.append([float(vec[i]) for i in range(3)])
+            r0=np.asarray(columns).T
+            p1=rground.T@(d.xpos[bid]-pg)
+            r1=rground.T@d.xmat[bid].reshape((3,3))
+            pos=float(np.linalg.norm(p1-p0))
+            cross=r0.T@r1
+            c=float(np.clip((np.trace(cross)-1)/2,-1,1))
+            ang=math.degrees(math.acos(c))
+            max_pos=max(max_pos,pos)
+            max_ang=max(max_ang,ang)
+            if not (math.isfinite(pos) and math.isfinite(ang)):
+                raise AssertionError("nonfinite independent OpenSim/native source FK")
+            if pos>0.001 or ang>0.5:
+                raise AssertionError(f"native OpenSim vs MuJoCo FK G5 mismatch {name}: {pos}m, {ang}deg")
+    return {"heldout_source_state_pairs":len(POSITIONS),
+            "source_body_comparisons":len(POSITIONS)*len(NAMES),
+            "native_opensim_vs_mujoco_max_position_error_m":max_pos,
+            "native_opensim_vs_mujoco_max_orientation_error_deg":max_ang,
+            "native_source_pose_G5":"PASS"}
+
+
 def main():
     import opensim, mujoco
     import tempfile
@@ -154,6 +215,7 @@ def main():
         if convert_code!=0:
             raise AssertionError("converter failed real XML stage")
         converted=check_compiled(out)
+        independent_fk=cross_engine_exact_heldout_fk(model,discover_converted(out))
         record={"experiment":"SIM-026C4B2D4A",
                 "scope":"completely independent source-free OpenSim 2-pin conversion",
                 "upstream_converter_pinned_sha":UPSTREAM_COMMIT,
@@ -162,7 +224,7 @@ def main():
                 "converter_check_report_bytes":report.stat().st_size,
                 "converter_stage1_exit_code":convert_code,
                 "native_compilation_and_topology":converted,
-                "native_source_matched_pose_G5":"NOT_EXECUTED_YET",
+                "native_source_matched_pose_G5":independent_fk,
                 "real_Rajagopal_source_evaluation":"NO_GO",
                 "original_source_redistribution_rights":"UNRESOLVED",
                 "3contact_3D_STS_or_human_orthosis":"NO_GO"}
