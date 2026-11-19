@@ -1,0 +1,31 @@
+name: "SIM-026C4B2D3B synthetic Lagrange energy and force audit"
+on:
+  push:
+    branches: [main]
+    paths:
+      - lab/sim026c4b2d3b.py
+      - tests/test_sim026c4b2d3b.py
+      - .github/workflows/synthetic-native-energy-d3b.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic_energy_dynamics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact native MuJoCo 3.3.6
+        run: |
+          python -m pip install --only-binary=:all: 'mujoco==3.3.6' 'numpy<3'
+      - name: Run 24 source-free native and analytical unit/negative tests
+        run: |
+          python -B -m unittest -v tests.test_sim026c4b2d3b
+      - name: Execute actual native 12-scenario energy force and reference sweep
+        run: |
+          python -B -m lab.sim026c4b2d3b
