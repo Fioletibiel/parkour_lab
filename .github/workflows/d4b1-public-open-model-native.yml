@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - experiment/d4b1-public-open-model-native-20261125
+      - main
     paths:
       - lab/d4b1_open_model_native.py
       - tests/test_d4b1_public_runner_contract.py
