@@ -196,8 +196,11 @@ def one_model(name: str, expected_blob: str, expected_size: int, source_root: Pa
     stage("source_topology")
     bodies = model.getBodySet()
     mass = sum(float(bodies.get(i).getMass()) for i in range(bodies.getSize()))
-    if (bodies.getSize(), model.getJointSet().getSize(),
-            model.getCoordinateSet().getSize()) != (22, 20, 39):
+    actual_topology = (bodies.getSize(), model.getJointSet().getSize(),
+                       model.getCoordinateSet().getSize())
+    print("D4B_PUBLIC_TOPOLOGY", name, "source_bodies", actual_topology[0],
+          "joints", actual_topology[1], "coordinates", actual_topology[2])
+    if actual_topology != (22, 20, 39):
         raise ValueError("ORIGINAL_SOURCE_TOPOLOGY_MISMATCH")
     stage("source_mass")
     if abs(mass - 75.337) > 1e-5:
