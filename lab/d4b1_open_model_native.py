@@ -29,6 +29,21 @@ EXTRA_HIPS = ((1.25, 1.10), (1.60, 1.45))
 POS_LIMIT_M, ANG_LIMIT_DEG = .001, .5
 COM_LIMIT_M, EQ_LIMIT, QERR_LIMIT = .001, 1e-9, 1e-9
 SOURCE_ROOT_ENV = "PUBLIC_OPEN_MODEL_SOURCE_ROOT"
+CURRENT_STAGE = "not_started"
+
+
+def stage(value: str) -> None:
+    """Whitelisted coarse stage classification, never raw file content."""
+    global CURRENT_STAGE
+    allowed = {
+        "source_identity", "opensim_load", "source_structure",
+        "converter_support", "stage1_conversion", "native_compile",
+        "core_fk", "2023_extension_fk", "completed",
+    }
+    if value not in allowed:
+        raise ValueError("UNRECOGNIZED_DIAGNOSTIC_STAGE")
+    CURRENT_STAGE = value
+
 
 
 def check_finite_nonnegative(value: float) -> float:
@@ -171,11 +186,14 @@ def one_model(name: str, expected_blob: str, expected_size: int, source_root: Pa
     import mujoco
     from osim2mujoco.checks import mujoco_compare as resolver
 
+    stage("source_identity")
     path = source_root / "Models" / "Rajagopal" / (name + ".osim")
     if path.stat().st_size != expected_size or model_git_sha1(path) != expected_blob:
         raise ValueError("ORIGINAL_PUBLIC_SOURCE_IDENTITY_MISMATCH")
+    stage("opensim_load")
     model = opensim.Model(str(path))
     model.initSystem()
+    stage("source_structure")
     bodies = model.getBodySet()
     mass = sum(float(bodies.get(i).getMass()) for i in range(bodies.getSize()))
     if (bodies.getSize(), model.getJointSet().getSize(),
@@ -188,6 +206,7 @@ def one_model(name: str, expected_blob: str, expected_size: int, source_root: Pa
     work.mkdir()
     geometry = path.parent / "Geometry"
     support = work / "support.json"
+    stage("converter_support")
     rc_check = converter_command(["check", str(path), "--geometry", str(geometry),
                                   "--json", str(support)])
     if rc_check or not support.is_file():
@@ -196,6 +215,7 @@ def one_model(name: str, expected_blob: str, expected_size: int, source_root: Pa
     if report.get("outcome") != "converts":
         raise ValueError("PINNED_CONVERTER_UNSUPPORTED_ORIGINAL_ELEMENT")
     output = work / "converted"
+    stage("stage1_conversion")
     rc_convert = converter_command(["convert", str(path), str(output),
                                     "--geometry", str(geometry), "--steps", "1"])
     if rc_convert:
@@ -207,6 +227,7 @@ def one_model(name: str, expected_blob: str, expected_size: int, source_root: Pa
     # The stage-1 output is checked using real MuJoCo dynamics data and
     # real source OpenSim positions; third-party mesh assets are irrelevant
     # to body-origin kinematics, so compile without mesh geoms.
+    stage("native_compile")
     native, _ = resolver.load_without_meshes(str(converted))
     if native.nbody <= 22:
         raise ValueError("NATIVE_BODY_STRUCTURE_INCOMPLETE")
@@ -217,15 +238,18 @@ def one_model(name: str, expected_blob: str, expected_size: int, source_root: Pa
         "native_mujoco_compiled": True, "source_body_count": bodies.getSize(),
         "source_body_mass_kg": round(mass, 6),
         "support_counts": report.get("counts", {}),
-        "core": verify_one_cohort(model, converted, CORE_KNEES, CORE_HIPS, "core"),
     }
+    stage("core_fk")
+    result["core"] = verify_one_cohort(model, converted, CORE_KNEES, CORE_HIPS, "core")
     if name == "RajagopalLaiUhlrich2023":
+        stage("2023_extension_fk")
         result["beyond_120deg"] = verify_one_cohort(
             model, converted, EXTRA_KNEES, EXTRA_HIPS, "2023_only")
     result["classification"] = "PASS" if (
         result["core"]["classification"] == "PASS" and
         result.get("beyond_120deg", {"classification": "PASS"})["classification"] == "PASS"
     ) else "FAIL"
+    stage("completed")
     return result
 
 
@@ -242,12 +266,14 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="public_d4b1_") as work:
         results = []
         for name, sha, size in MODELS:
+            stage("source_identity")
             try:
                 result = one_model(name, sha, size, Path(source), Path(work))
             except Exception as exc:
                 # No raw model arrays, paths, XML or source-related exception text
                 # in public logs; return only type and generic failure category.
                 result = {"model": name, "classification": "ERROR",
+                          "failure_stage": CURRENT_STAGE,
                           "error_type": type(exc).__name__}
             results.append(result)
             print("D4B_PUBLIC_MODEL_AGGREGATE", json.dumps(result, sort_keys=True))
