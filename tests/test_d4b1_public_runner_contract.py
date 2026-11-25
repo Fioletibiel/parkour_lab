@@ -36,7 +36,7 @@ class PublicD4B1Contract(unittest.TestCase):
             path = Path(d) / "fixture.txt"
             path.write_bytes(payload)
             expected = hashlib.sha1(
-                b"blob " + str(len(payload)).encode() + b"\\0" + payload
+                b"blob " + str(len(payload)).encode() + b"\0" + payload
             ).hexdigest()
             self.assertEqual(mod.model_git_sha1(path), expected)
 
