@@ -36,7 +36,7 @@ def stage(value: str) -> None:
     """Whitelisted coarse stage classification, never raw file content."""
     global CURRENT_STAGE
     allowed = {
-        "source_identity", "opensim_load", "source_structure",
+        "source_identity", "opensim_load", "source_topology", "source_mass",
         "converter_support", "stage1_conversion", "native_compile",
         "core_fk", "2023_extension_fk", "completed",
     }
@@ -193,12 +193,13 @@ def one_model(name: str, expected_blob: str, expected_size: int, source_root: Pa
     stage("opensim_load")
     model = opensim.Model(str(path))
     model.initSystem()
-    stage("source_structure")
+    stage("source_topology")
     bodies = model.getBodySet()
     mass = sum(float(bodies.get(i).getMass()) for i in range(bodies.getSize()))
     if (bodies.getSize(), model.getJointSet().getSize(),
             model.getCoordinateSet().getSize()) != (22, 20, 39):
         raise ValueError("ORIGINAL_SOURCE_TOPOLOGY_MISMATCH")
+    stage("source_mass")
     if abs(mass - 75.337) > 1e-5:
         raise ValueError("ORIGINAL_SOURCE_MASS_MISMATCH")
 
