@@ -23,6 +23,14 @@ The probe compares 4 synthetic **coordinate inputs** for both openly published s
 
 This experimental workflow must be evaluated on its own merits; do not treat successful CI startup or the older synthetic results as native anatomical validation. For detailed governance, refer to the private project documentation (not copied here).
 
+## D4B2-P1a — real public-source 80-muscle path screening
+
+The **2026-11-26** native OpenSim-to-MuJoCo muscle-path baseline ran on the public standard runner as GitHub Actions [45848997334](https://github.com/Fioletibiel/parkour_lab/actions/runs/45848997334), using **only transient, publicly published official Rajagopal source models**. 9/9 source-free preflight tests passed; all 80 named muscles in each model were compared against unoptimized stage-1 MuJoCo tendons. Four core static poses per original model and two 2023-specific >120° poses were included. Source/native finite difference self-consistency, original QErr and native equality residual gates passed.
+
+**Important scientific caution:** the measured stage-1 paths still exhibit substantial **outlier errors**. The 2016 and 2023 core worst absolute muscle-path length errors were approximately **204 mm**, while the worst scored knee/hip arm pair RMS errors were approximately **57.8 mm**. The 2023 beyond-120° pose extension showed ~**9.44 mm** worst path-length error and ~**14.9 mm** worst arm-pair RMS error. Small median muscle errors do **not** make this an accurate anatomical muscle model.
+
+This study's `SCREEN_VALID_MEASURED` outcome refers **only to coverage and soundness of the measurements**. Stage-2 fitted muscle-path accuracy, stage-3 muscle forces, tendon elasticity, dynamic sit-to-stand and clinical safety were **not** validated. See the [frozen D4B2-P1a protocol](lab/D4B2_MUSCLE_PATH_SCREEN_PROTOCOL_2026-11-26.md). Detailed interpretation and follow-up are maintained in the private research repository.
+
 ## Original source-free synthetic engine experiments
 
 The following rules describe the legacy **synthetic-only** jobs, not the separate D4B1 public-source native workflow above. All results require review before use in private research.
