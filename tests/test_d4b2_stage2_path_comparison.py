@@ -60,8 +60,7 @@ class Stage2ComparisonTest(unittest.TestCase):
     def test_public_protocol_preserves_stage1_stage2_comparison(self):
         p=(Path(__file__).resolve().parents[1]/"lab"/
            "D4B2_P1B_STAGE2_PROTOCOL_2026-11-26.md").read_text()
-        self.assertIn("same six",p.lower().replace("same 4 predeclared core poses and separately reported 2 high-flexion poses","same six"))
-        self.assertIn("No stage",p) if False else None
+        self.assertIn("same 4 predeclared core poses and separately reported 2 high-flexion poses",p.lower())
         self.assertIn("no absolute path accuracy PASS",p)
         self.assertIn("no muscles removed",p)
 
