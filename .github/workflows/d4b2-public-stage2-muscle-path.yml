@@ -1,0 +1,108 @@
+name: "D4B2-P1b 2023 Muscle-Path Stage2 versus Stage1"
+
+on:
+  push:
+    branches:
+      - experiment/d4b2-stage2-path-improvement-20261126
+      - main
+    paths:
+      - lab/d4b2_stage2_path_comparison.py
+      - lab/d4b2_muscle_path_screen.py
+      - lab/D4B2_P1B_STAGE2_PROTOCOL_2026-11-26.md
+      - tests/test_d4b2_stage2_path_comparison.py
+      - .github/workflows/d4b2-public-stage2-muscle-path.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - lab/d4b2_stage2_path_comparison.py
+      - lab/d4b2_muscle_path_screen.py
+      - lab/D4B2_P1B_STAGE2_PROTOCOL_2026-11-26.md
+      - tests/test_d4b2_stage2_path_comparison.py
+      - .github/workflows/d4b2-public-stage2-muscle-path.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-native-80-muscle-path-screen:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MPLBACKEND: Agg
+      PYTHONWARNINGS: ignore
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout public lab without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Transient public original OpenSim models
+        uses: actions/checkout@v4
+        with:
+          repository: opensim-org/opensim-models
+          ref: d9b05d470b1a481c222372c85b75772faf8f7792
+          path: vendor/original_open_models
+          sparse-checkout: |
+            Models/Rajagopal
+            Geometry
+          persist-credentials: false
+
+      - name: Transient public pinned converter source
+        uses: actions/checkout@v4
+        with:
+          repository: wafisharif/osim2mujoco
+          ref: 8c4d97e96f43c0d1676b8d58b0cff95af72a0f0f
+          path: vendor/public_converter
+          persist-credentials: false
+
+      - name: Setup pinned Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install original native tools (only public sources)
+        run: |
+          python -m pip install --only-binary=:all: 'opensim==4.6' 'mujoco==3.15.0' 'numpy==2.5.3'
+          python -m pip install ./vendor/public_converter
+          python -m pip check
+
+      - name: Check program syntax and 16 source-free scientific tests
+        run: |
+          python -m py_compile lab/d4b2_muscle_path_screen.py lab/d4b2_stage2_path_comparison.py
+          python -m unittest discover -s tests -p 'test_d4b2*.py' -v
+
+      - name: Assemble transient public geometry (preserve model-local originals)
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from shutil import copy2
+          root = Path("vendor/original_open_models")
+          shared = root / "Geometry"
+          local = root / "Models" / "Rajagopal" / "Geometry"
+          if not shared.is_dir() or not (root / "Models" / "Rajagopal").is_dir():
+              raise SystemExit("PUBLIC_SOURCE_GEOMETRY_NOT_FOUND")
+          local.mkdir(parents=True, exist_ok=True)
+          copied=0
+          for source in shared.iterdir():
+              if source.is_file() and not (local / source.name).exists():
+                  copy2(source, local / source.name)
+                  copied+=1
+          print("D4B2_PUBLIC_TRANSIENT_GEOMETRY_COMBINED",copied)
+          PY
+
+      - name: Compare original 2023 fitted stage2 versus unchanged stage1 paths
+        env:
+          PUBLIC_OPEN_MODEL_SOURCE_ROOT: ${{ github.workspace }}/vendor/original_open_models
+        run: |
+          python -B -m lab.d4b2_stage2_path_comparison
+
+      - name: Remove transient original sources and converted assets
+        if: always()
+        run: |
+          rm -rf -- vendor/original_open_models vendor/public_converter
+          echo "D4B2_PUBLIC_TEMP_SOURCES_REMOVED no_models_uploaded=true"
