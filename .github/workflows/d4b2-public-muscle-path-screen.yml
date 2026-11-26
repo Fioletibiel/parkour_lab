@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - experiment/d4b2-muscle-path-screen-20261126
+      - main
     paths:
       - lab/d4b2_muscle_path_screen.py
       - lab/D4B2_MUSCLE_PATH_SCREEN_PROTOCOL_2026-11-26.md
